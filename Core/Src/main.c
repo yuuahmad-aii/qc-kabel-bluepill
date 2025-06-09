@@ -36,9 +36,12 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+// config
+#define DEBUG_MODE 0 // 1 = aktif, 0 = non-aktif
+
 #define NUM_OUTPUT_PCFS 1
-#define NUM_INPUT_PCFS  1
-#define PINS_PER_PCF    8
+#define NUM_INPUT_PCFS 1
+#define PINS_PER_PCF 8
 
 // Alamat I2C dasar untuk PCF8574 (non-A variant)
 // Alamat 7-bit adalah 0x20. Untuk HAL, alamat ini di-shift left 1 kali.
@@ -47,10 +50,10 @@
 
 // I2C Handles (diasumsikan hi2c1 dan hi2c2 didefinisikan oleh CubeMX)
 #define I2C_OUTPUT_HANDLE hi2c1
-#define I2C_INPUT_HANDLE  hi2c2
+#define I2C_INPUT_HANDLE hi2c2
 
-#define I2C_TIMEOUT_MS 100 // Timeout untuk operasi I2C
-#define TEST_OUTPUT_DELAY_MS 10 // Delay setelah mengaktifkan satu output sebelum membaca input
+#define I2C_TIMEOUT_MS 100		   // Timeout untuk operasi I2C
+#define TEST_OUTPUT_DELAY_MS 10	   // Delay setelah mengaktifkan satu output sebelum membaca input
 #define INTER_PIN_TEST_DELAY_MS 50 // Delay antar pengujian pin output berikutnya
 
 // Buffer untuk string output serial
@@ -69,12 +72,15 @@ I2C_HandleTypeDef hi2c2;
 
 /* Definitions for CableTester */
 osThreadId_t CableTesterHandle;
-const osThreadAttr_t CableTester_attributes = { .name = "CableTester",
-		.stack_size = 256 * 4, .priority = (osPriority_t) osPriorityNormal, };
+const osThreadAttr_t CableTester_attributes = {
+	.name = "CableTester",
+	.stack_size = 256 * 4,
+	.priority = (osPriority_t)osPriorityNormal,
+};
 /* Definitions for CableTesterSema */
 osSemaphoreId_t CableTesterSemaHandle;
 const osSemaphoreAttr_t CableTesterSema_attributes =
-		{ .name = "CableTesterSema" };
+	{.name = "CableTesterSema"};
 /* USER CODE BEGIN PV */
 // Alamat untuk PCF8574 output di I2C1
 uint8_t output_pcf_addresses[NUM_OUTPUT_PCFS];
@@ -82,7 +88,7 @@ uint8_t output_pcf_addresses[NUM_OUTPUT_PCFS];
 uint8_t input_pcf_addresses[NUM_INPUT_PCFS];
 
 volatile bool g_test_running = false; // Flag untuk status tes
-char usb_rx_buffer[16]; // Buffer untuk perintah serial
+char usb_rx_buffer[16];				  // Buffer untuk perintah serial
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,19 +100,22 @@ void StartCableTester(void *argument);
 
 /* USER CODE BEGIN PFP */
 static HAL_StatusTypeDef PCF8574_WriteByte(I2C_HandleTypeDef *hi2c,
-		uint8_t device_address, uint8_t data);
+										   uint8_t device_address, uint8_t data);
 static HAL_StatusTypeDef PCF8574_ReadByte(I2C_HandleTypeDef *hi2c,
-		uint8_t device_address, uint8_t *read_data);
+										  uint8_t device_address, uint8_t *read_data);
 static void Initialize_PCF_Addresses(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int _write(int file, char *ptr, int len) {
+int _write(int file, char *ptr, int len)
+{
 	// Implementasi sederhana, bisa ditambahkan timeout atau mekanisme non-blocking
 	uint32_t timeout_start = HAL_GetTick();
-	while (CDC_Transmit_FS((uint8_t*) ptr, len) == USBD_BUSY) {
-		if (HAL_GetTick() - timeout_start > 100) { // Timeout 100ms
+	while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY)
+	{
+		if (HAL_GetTick() - timeout_start > 100)
+		{			   // Timeout 100ms
 			return -1; // Gagal
 		}
 		osDelay(1); // Beri kesempatan RTOS
@@ -119,7 +128,8 @@ int _write(int file, char *ptr, int len) {
  * @brief  The application entry point.
  * @retval int
  */
-int main(void) {
+int main(void)
+{
 
 	/* USER CODE BEGIN 1 */
 
@@ -148,8 +158,8 @@ int main(void) {
 	/* USER CODE BEGIN 2 */
 	MX_USB_DEVICE_Init();
 	Initialize_PCF_Addresses();
-//	printf("Cable Tester STM32F103C8T6 - PCF8574\r\n");
-//	printf("Inisialisasi selesai. Memulai RTOS...\r\n");
+	//	printf("Cable Tester STM32F103C8T6 - PCF8574\r\n");
+	//	printf("Inisialisasi selesai. Memulai RTOS...\r\n");
 	/* USER CODE END 2 */
 
 	/* Init scheduler */
@@ -178,17 +188,23 @@ int main(void) {
 	/* Create the thread(s) */
 	/* creation of CableTester */
 	CableTesterHandle = osThreadNew(StartCableTester, NULL,
-			&CableTester_attributes);
+									&CableTester_attributes);
 
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
-	if (CableTesterHandle == NULL) {
+	if (CableTesterHandle == NULL)
+	{
+#if DEBUG_MODE == 1
 		printf("FATAL Error: Gagal membuat CableTesterTask!\r\n");
+#endif
 		Error_Handler();
 	}
 
-	if (CableTesterSemaHandle == NULL) {
+	if (CableTesterSemaHandle == NULL)
+	{
+#if DEBUG_MODE == 1
 		printf("FATAL Error: Gagal membuat CableTesterSemaHandle!\r\n");
+#endif
 		Error_Handler();
 	}
 	/* USER CODE END RTOS_THREADS */
@@ -204,7 +220,8 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	while (1) {
+	while (1)
+	{
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -216,10 +233,11 @@ int main(void) {
  * @brief System Clock Configuration
  * @retval None
  */
-void SystemClock_Config(void) {
-	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
-	RCC_PeriphCLKInitTypeDef PeriphClkInit = { 0 };
+void SystemClock_Config(void)
+{
+	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
 	/** Initializes the RCC Oscillators according to the specified parameters
 	 * in the RCC_OscInitTypeDef structure.
@@ -231,25 +249,27 @@ void SystemClock_Config(void) {
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
 	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
 	RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	{
 		Error_Handler();
 	}
 
 	/** Initializes the CPU, AHB and APB buses clocks
 	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
 	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
 	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
 	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
 	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+	{
 		Error_Handler();
 	}
 	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
 	PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
-	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
+	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+	{
 		Error_Handler();
 	}
 }
@@ -259,7 +279,8 @@ void SystemClock_Config(void) {
  * @param None
  * @retval None
  */
-static void MX_I2C1_Init(void) {
+static void MX_I2C1_Init(void)
+{
 
 	/* USER CODE BEGIN I2C1_Init 0 */
 
@@ -277,13 +298,13 @@ static void MX_I2C1_Init(void) {
 	hi2c1.Init.OwnAddress2 = 0;
 	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
 	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-	if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
+	if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+	{
 		Error_Handler();
 	}
 	/* USER CODE BEGIN I2C1_Init 2 */
 
 	/* USER CODE END I2C1_Init 2 */
-
 }
 
 /**
@@ -291,7 +312,8 @@ static void MX_I2C1_Init(void) {
  * @param None
  * @retval None
  */
-static void MX_I2C2_Init(void) {
+static void MX_I2C2_Init(void)
+{
 
 	/* USER CODE BEGIN I2C2_Init 0 */
 
@@ -309,13 +331,13 @@ static void MX_I2C2_Init(void) {
 	hi2c2.Init.OwnAddress2 = 0;
 	hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
 	hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-	if (HAL_I2C_Init(&hi2c2) != HAL_OK) {
+	if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+	{
 		Error_Handler();
 	}
 	/* USER CODE BEGIN I2C2_Init 2 */
 
 	/* USER CODE END I2C2_Init 2 */
-
 }
 
 /**
@@ -323,8 +345,9 @@ static void MX_I2C2_Init(void) {
  * @param None
  * @retval None
  */
-static void MX_GPIO_Init(void) {
-	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+static void MX_GPIO_Init(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 	/* USER CODE BEGIN MX_GPIO_Init_1 */
 
 	/* USER CODE END MX_GPIO_Init_1 */
@@ -361,12 +384,15 @@ static void MX_GPIO_Init(void) {
 /**
  * @brief Menginisialisasi array alamat PCF8574.
  */
-static void Initialize_PCF_Addresses(void) {
-	for (int i = 0; i < NUM_OUTPUT_PCFS; i++) {
+static void Initialize_PCF_Addresses(void)
+{
+	for (int i = 0; i < NUM_OUTPUT_PCFS; i++)
+	{
 		// Alamat 7-bit PCF8574 adalah 0x20 + i (jika A0-A2 di-set 0 hingga 7)
 		output_pcf_addresses[i] = (PCF8574_BASE_ADDRESS + i) << 1; // Shift left untuk HAL API
 	}
-	for (int i = 0; i < NUM_INPUT_PCFS; i++) {
+	for (int i = 0; i < NUM_INPUT_PCFS; i++)
+	{
 		input_pcf_addresses[i] = (PCF8574_BASE_ADDRESS + i) << 1; // Shift left untuk HAL API
 	}
 }
@@ -379,11 +405,12 @@ static void Initialize_PCF_Addresses(void) {
  * @retval HAL_StatusTypeDef Status operasi.
  */
 static HAL_StatusTypeDef PCF8574_WriteByte(I2C_HandleTypeDef *hi2c,
-		uint8_t device_address, uint8_t data) {
+										   uint8_t device_address, uint8_t data)
+{
 	uint8_t buffer[1];
 	buffer[0] = data;
 	return HAL_I2C_Master_Transmit(hi2c, device_address, buffer, 1,
-	I2C_TIMEOUT_MS);
+								   I2C_TIMEOUT_MS);
 }
 
 /**
@@ -394,38 +421,63 @@ static HAL_StatusTypeDef PCF8574_WriteByte(I2C_HandleTypeDef *hi2c,
  * @retval HAL_StatusTypeDef Status operasi.
  */
 static HAL_StatusTypeDef PCF8574_ReadByte(I2C_HandleTypeDef *hi2c,
-		uint8_t device_address, uint8_t *read_data) {
+										  uint8_t device_address, uint8_t *read_data)
+{
 	return HAL_I2C_Master_Receive(hi2c, device_address, read_data, 1,
-	I2C_TIMEOUT_MS);
+								  I2C_TIMEOUT_MS);
 }
 
 // Handler untuk data yang diterima dari USB CDC
-void USB_CDC_RxHandler(uint8_t *Buf, uint32_t Len) {
-	if (Len > 0 && Len < sizeof(usb_rx_buffer)) {
+void USB_CDC_RxHandler(uint8_t *Buf, uint32_t Len)
+{
+	if (Len > 0 && Len < sizeof(usb_rx_buffer))
+	{
 		memcpy(usb_rx_buffer, Buf, Len);
 		usb_rx_buffer[Len] = '\0'; // Pastikan null-terminated
 
-		if (Len == 1) {
-			if (usb_rx_buffer[0] == '?') { // Perintah START
-				if (!g_test_running) {
+		if (Len == 1)
+		{
+			if (usb_rx_buffer[0] == '?')
+			{ // Perintah START
+				if (!g_test_running)
+				{
 					g_test_running = true;
 					osSemaphoreRelease(CableTesterSemaHandle); // Beri sinyal ke task untuk mulai
+#if DEBUG_MODE == 1
 					printf("OK: Perintah START diterima. Memulai tes...\r\n");
-				} else {
+#endif
+				}
+				else
+				{
+#if DEBUG_MODE == 1
 					printf("WARN: Tes sudah berjalan.\r\n");
+#endif
 				}
-			} else if (usb_rx_buffer[0] == '!') { // Perintah STOP
-				if (g_test_running) {
+			}
+			else if (usb_rx_buffer[0] == '!')
+			{ // Perintah STOP
+				if (g_test_running)
+				{
 					g_test_running = false;
+#if DEBUG_MODE == 1
 					printf(
-							"OK: Perintah STOP diterima. Tes akan berhenti setelah pin saat ini.\r\n");
-				} else {
-					printf("INFO: Tes tidak sedang berjalan.\r\n");
+						"OK: Perintah STOP diterima. Tes akan berhenti setelah pin saat ini.\r\n");
+#endif
 				}
-			} else {
+				else
+				{
+#if DEBUG_MODE == 1
+					printf("INFO: Tes tidak sedang berjalan.\r\n");
+#endif
+				}
+			}
+			else
+			{
+#if DEBUG_MODE == 1
 				printf(
-						"ERROR: Perintah tidak dikenal '%c'. Gunakan '?' untuk start, '!' untuk stop.\r\n",
-						usb_rx_buffer[0]);
+					"ERROR: Perintah tidak dikenal '%c'. Gunakan '?' untuk start, '!' untuk stop.\r\n",
+					usb_rx_buffer[0]);
+#endif
 			}
 		}
 	}
@@ -440,53 +492,67 @@ void USB_CDC_RxHandler(uint8_t *Buf, uint32_t Len) {
  * @retval None
  */
 /* USER CODE END Header_StartCableTester */
-void StartCableTester(void *argument) {
+void StartCableTester(void *argument)
+{
 	/* init code for USB_DEVICE */
 	MX_USB_DEVICE_Init();
 	/* USER CODE BEGIN 5 */
 	uint8_t input_pcf_data[NUM_INPUT_PCFS];
 
+#if DEBUG_MODE == 1
 	printf("Cable Tester Siap. Kirim '?' untuk memulai tes.\r\n");
+#endif
+	printf("Ready\r\n");
 
 	// Inisialisasi semua PCF8574 input ke mode input (tulis 0xFF)
-	for (int i = 0; i < NUM_INPUT_PCFS; i++) {
+	for (int i = 0; i < NUM_INPUT_PCFS; i++)
+	{
 		PCF8574_WriteByte(&I2C_INPUT_HANDLE, input_pcf_addresses[i], 0xFF);
 	}
 	osDelay(10);
 	// Matikan semua output PCF8574 awal (semua high agar output mati)
-	for (int i = 0; i < NUM_OUTPUT_PCFS; i++) {
+	for (int i = 0; i < NUM_OUTPUT_PCFS; i++)
+	{
 		PCF8574_WriteByte(&I2C_OUTPUT_HANDLE, output_pcf_addresses[i], 0xFF);
 	}
 	osDelay(100);
 	HAL_StatusTypeDef status;
 	/* Infinite loop */
-	for (;;) {
+	for (;;)
+	{
 		// 1. Tunggu perintah START dari semaphore
 		osSemaphoreAcquire(CableTesterSemaHandle, osWaitForever);
-		if (!g_test_running) { // Pengecekan jika ada wakeup palsu
+		if (!g_test_running)
+		{ // Pengecekan jika ada wakeup palsu
 			continue;
 		}
 
+#if DEBUG_MODE == 1
 		printf("--- Memulai Siklus Tes Kabel ---\r\n");
+#endif
+		printf("Start\r\n");
 
 		for (int out_pcf_idx = 0; out_pcf_idx < NUM_OUTPUT_PCFS;
-				out_pcf_idx++) {
+			 out_pcf_idx++)
+		{
 			for (int out_pin_idx = 0; out_pin_idx < PINS_PER_PCF;
-					out_pin_idx++) {
+				 out_pin_idx++)
+			{
 				// *** PERIKSA PERINTAH BERHENTI ***
-				if (!g_test_running) {
+				if (!g_test_running)
+				{
 					goto test_loop_exit;
 					// Gunakan goto untuk keluar dari loop bersarang
 				}
 
-				int absolute_out_pin = (out_pcf_idx * PINS_PER_PCF)
-						+ out_pin_idx + 1;
+				int absolute_out_pin = (out_pcf_idx * PINS_PER_PCF) + out_pin_idx + 1;
 				uint8_t output_byte = ~(1 << out_pin_idx);
 
 				status = PCF8574_WriteByte(&I2C_OUTPUT_HANDLE,
-						output_pcf_addresses[out_pcf_idx], output_byte);
-				if (status != HAL_OK) {
-					printf("%d;ERROR_WRITE\r\n", absolute_out_pin);
+										   output_pcf_addresses[out_pcf_idx], output_byte);
+				if (status != HAL_OK)
+				{
+					printf("%d;error_write\r\n", absolute_out_pin);
 					osDelay(INTER_PIN_TEST_DELAY_MS);
 					continue;
 				}
@@ -496,65 +562,78 @@ void StartCableTester(void *argument) {
 				int detected_count = 0;
 				int buffer_offset = 0;
 				buffer_offset += snprintf(serial_out_buffer + buffer_offset,
-				SERIAL_OUT_BUFFER_SIZE - buffer_offset, "%d;",
-						absolute_out_pin);
+										  SERIAL_OUT_BUFFER_SIZE - buffer_offset, "%d;",
+										  absolute_out_pin);
 
 				for (int in_pcf_idx = 0; in_pcf_idx < NUM_INPUT_PCFS;
-						in_pcf_idx++) {
+					 in_pcf_idx++)
+				{
 					status = PCF8574_ReadByte(&I2C_INPUT_HANDLE,
-							input_pcf_addresses[in_pcf_idx],
-							&input_pcf_data[in_pcf_idx]);
+											  input_pcf_addresses[in_pcf_idx],
+											  &input_pcf_data[in_pcf_idx]);
 					if (status != HAL_OK)
 						continue;
 
 					for (int in_pin_idx = 0; in_pin_idx < PINS_PER_PCF;
-							in_pin_idx++) {
-						if (((input_pcf_data[in_pcf_idx] >> in_pin_idx) & 0x01)
-								== 0) {
-							int absolute_in_pin = (in_pcf_idx * PINS_PER_PCF)
-									+ in_pin_idx + 1;
-							if (detected_count > 0) {
+						 in_pin_idx++)
+					{
+						if (((input_pcf_data[in_pcf_idx] >> in_pin_idx) & 0x01) == 0)
+						{
+							int absolute_in_pin = (in_pcf_idx * PINS_PER_PCF) + in_pin_idx + 1;
+							if (detected_count > 0)
+							{
 								if (SERIAL_OUT_BUFFER_SIZE - buffer_offset > 1)
 									buffer_offset += snprintf(
-											serial_out_buffer + buffer_offset,
-											SERIAL_OUT_BUFFER_SIZE
-													- buffer_offset, ",");
-							}
-							if (SERIAL_OUT_BUFFER_SIZE - buffer_offset > 5) {
-								buffer_offset += snprintf(
 										serial_out_buffer + buffer_offset,
-										SERIAL_OUT_BUFFER_SIZE - buffer_offset,
-										"%d", absolute_in_pin);
+										SERIAL_OUT_BUFFER_SIZE - buffer_offset, ",");
+							}
+							if (SERIAL_OUT_BUFFER_SIZE - buffer_offset > 5)
+							{
+								buffer_offset += snprintf(
+									serial_out_buffer + buffer_offset,
+									SERIAL_OUT_BUFFER_SIZE - buffer_offset,
+									"%d", absolute_in_pin);
 							}
 							detected_count++;
 						}
 					}
 				}
 
-				if (SERIAL_OUT_BUFFER_SIZE - buffer_offset > 3) {
+				if (SERIAL_OUT_BUFFER_SIZE - buffer_offset > 3)
+				{
 					buffer_offset += snprintf(serial_out_buffer + buffer_offset,
-					SERIAL_OUT_BUFFER_SIZE - buffer_offset, "\r\n");
+											  SERIAL_OUT_BUFFER_SIZE - buffer_offset, "\r\n");
 				}
 				printf("%s", serial_out_buffer);
 
 				status = PCF8574_WriteByte(&I2C_OUTPUT_HANDLE,
-						output_pcf_addresses[out_pcf_idx], 0xFF);
+										   output_pcf_addresses[out_pcf_idx], 0xFF);
 				osDelay(INTER_PIN_TEST_DELAY_MS);
 			}
 		}
 
-		test_loop_exit:
+	test_loop_exit:
 		// Matikan semua output setelah siklus selesai atau dihentikan
-		for (int i = 0; i < NUM_OUTPUT_PCFS; i++) {
+		for (int i = 0; i < NUM_OUTPUT_PCFS; i++)
+		{
 			PCF8574_WriteByte(&I2C_OUTPUT_HANDLE, output_pcf_addresses[i],
-					0xFF);
+							  0xFF);
 		}
 
-		if (g_test_running) { // Jika selesai secara normal
+		if (g_test_running)
+		{ // Jika selesai secara normal
+#if DEBUG_MODE == 1
 			printf("--- Siklus Tes Selesai. Kirim '?' untuk tes lagi. ---\r\n");
-		} else { // Jika dihentikan oleh perintah '!'
+#endif
+			printf("end\r\n");
+		}
+		else
+		{ // Jika dihentikan oleh perintah '!'
+#if DEBUG_MODE == 1
 			printf(
-					"--- Tes Dihentikan. Kirim '?' untuk memulai tes baru. ---\r\n");
+				"--- Tes Dihentikan. Kirim '?' untuk memulai tes baru. ---\r\n");
+#endif
+			printf("stop\r\n");
 		}
 		g_test_running = false; // Reset flag setelah selesai atau dihentikan
 	}
@@ -569,11 +648,13 @@ void StartCableTester(void *argument) {
  * @param  htim : TIM handle
  * @retval None
  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
 	/* USER CODE BEGIN Callback 0 */
 
 	/* USER CODE END Callback 0 */
-	if (htim->Instance == TIM4) {
+	if (htim->Instance == TIM4)
+	{
 		HAL_IncTick();
 	}
 	/* USER CODE BEGIN Callback 1 */
@@ -585,28 +666,30 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
  * @brief  This function is executed in case of error occurrence.
  * @retval None
  */
-void Error_Handler(void) {
+void Error_Handler(void)
+{
 	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
-	while (1) {
+	while (1)
+	{
 	}
 	/* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+	/* USER CODE BEGIN 6 */
+	/* User can add his own implementation to report the file name and line number,
+	   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+	/* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
